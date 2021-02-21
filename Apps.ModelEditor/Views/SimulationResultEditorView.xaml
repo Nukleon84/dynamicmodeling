@@ -1,0 +1,74 @@
+﻿<UserControl x:Class="Apps.ModelEditor.Views.SimulationResultEditorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:Apps.ModelEditor.Views"
+               xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
+                xmlns:cal="http://www.caliburnproject.org"
+              xmlns:oxy="http://oxyplot.org/wpf"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <TabControl>
+        <TabItem Header="Trend">
+            <DockPanel>
+                <ListView DockPanel.Dock="Bottom" ItemsSource="{Binding TrendPlotModel.Series}">
+                    <ListView.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel></WrapPanel>
+                        </ItemsPanelTemplate>
+                    </ListView.ItemsPanel>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox Content="{Binding Title}" IsChecked="{Binding IsVisible}"   
+                                      cal:Action.TargetWithoutContext="{Binding Path=DataContext.TrendPlotModel,RelativeSource={RelativeSource AncestorType=UserControl}}" 
+                                      cal:Message.Attach="[Event Unchecked] = [Action InvalidatePlot(false)];[Event Checked] = [Action InvalidatePlot(false)]"></CheckBox>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            <oxy:PlotView Model="{Binding TrendPlotModel}"/>
+            </DockPanel>
+        </TabItem>
+        <TabItem Header="Phase">
+            <oxy:PlotView Model="{Binding PhasePlotModel}"/>
+        </TabItem>
+        <TabItem Header="Table">
+            
+        </TabItem>
+        <TabItem Header="Syntax Tree">
+            <avalonEdit:TextEditor x:Name="syntaxTreeEditor"
+                ShowLineNumbers="True"  
+                               FontFamily="Consolas"
+                               SyntaxHighlighting="C#"
+                               FontSize="10pt"
+                               Document="{Binding SyntaxTreeDocument}"                               
+                               />
+        </TabItem>
+        
+        <TabItem Header="Instance Tree">
+            <avalonEdit:TextEditor x:Name="instanceTreeEditor"
+                ShowLineNumbers="True"  
+                               FontFamily="Consolas"
+                               SyntaxHighlighting="C#"
+                               FontSize="10pt"
+                               Document="{Binding InstanceTreeDocument}"                               
+                               />
+        </TabItem>
+        <TabItem Header="Flattened Model">
+            <avalonEdit:TextEditor
+                x:Name="flatModelEditor"
+                ShowLineNumbers="True"  
+                               FontFamily="Consolas"
+                               SyntaxHighlighting="C#"
+                               FontSize="10pt"
+                               Document="{Binding FlatModelDocument}"                               
+                               />
+        </TabItem>
+        <TabItem Header="Simulation Log">
+
+        </TabItem>
+        <TabItem Header="Statistics">
+
+        </TabItem>
+    </TabControl>
+</UserControl>

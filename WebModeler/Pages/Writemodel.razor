@@ -1,0 +1,194 @@
+﻿@page "/writemodel"
+@using System.Text
+@using ModelingFramework.Core.Modelica
+@using ModelingFramework.Core.Logging
+@using ModelingFramework.Core.Numerics
+@using ModelingFramework.Core.Interfaces
+@using System.Diagnostics;
+@inject ModelicaParser Parser
+@inject ModelicaTreePrinter Printer
+
+<form class="row w-100 h-100">
+
+    <div class="form-group">
+        <label for="skipTimesTextbox">TimeStep</label>
+        <input @bind="TimeStep" id="TimeStepTextbox" />
+    </div>
+    <div class="form-group">
+        <label for="skipTimesTextbox">EndTime</label>
+        <input @bind="EndTime" id="EndTimeTextbox" />
+    </div>
+
+    <div class="form-group">
+        <label for="skipTimesTextbox">Reporting Interval</label>
+        <input @bind="Skip" id="skipTimesTextbox" />
+    </div>
+
+    <div class="form-group">
+        <label for="explicitEulerTextbox">ExplicitEuler</label>
+        <input type="checkbox" @bind="Explicit" id="explicitEulerTextbox" />
+    </div>
+
+
+    <div class="row w-100 h-100">
+        <div class="col-6">
+            <textarea class="form-control w-100 h-100" rows="3" style="font-family:Consolas;" value="@Code" @oninput="@UpdateCode">@Code</textarea>
+        </div>
+        <div class="col-6">
+            <textarea class="form-control w-100 h-100" rows="3" style="font-family:Consolas;" @bind="Structure"> </textarea>
+        </div>
+    </div>
+
+
+</form>
+
+<button class="btn btn-primary col-md-12" @onclick="Solve">Solve</button>
+
+<div class="row" style="height: 400px;">
+    <div class="col-md-12 col-sm-12 p-4">
+        <RadzenChart>
+
+            @for (int c = 0; c < Names.Count; c++)
+            {
+                <RadzenLineSeries Smooth="true" Data="@Data[c]" CategoryProperty="Time" Title="@Names[c]" ValueProperty="Value">
+                    <RadzenMarkers MarkerType="MarkerType.Circle" />
+                </RadzenLineSeries>
+            }
+
+            <RadzenCategoryAxis Padding="20" />
+            <RadzenValueAxis>
+                <RadzenGridLines Visible="true" />
+                <RadzenAxisTitle Text="Value" />
+            </RadzenValueAxis>
+        </RadzenChart>
+    </div>
+</div>
+<div class="alert alert-danger">@Error</div>
+
+
+
+@code {
+    public string Code { get; set; } =
+ @"
+class LotkaVolterra
+Real Prey = 10;
+Real Predator = 5;
+Real y=0;
+parameter Real a = 0.09;
+parameter Real b = 0.01;
+parameter Real c = 0.01;
+parameter Real d = 0.04;
+equation
+    der(Prey) = Prey*(a-b*Predator);
+    der(Predator) = -Predator*(d-c*Prey);
+    y=5*sin(time)+10;
+end LotkaVolterra;";
+
+    public string Structure { get; set; }
+    public string Error { get; set; }
+
+    public double TimeStep { get; set; } = 0.1;
+    public double EndTime { get; set; } = 200;
+    public int Skip { get; set; } = 50;
+    public bool Explicit { get; set; } = true;
+
+
+    class DataItem
+    {
+        public double Time { get; set; }
+        public double Value { get; set; }
+    }
+
+    List<List<DataItem>> Data = new List<List<DataItem>>();
+    List<string> Names = new List<string>();
+
+    private void Solve()
+    {
+        Task.Run(() => SolveBackground());
+
+    }
+
+    private void SolveBackground()
+    {
+
+        var status = Parser.TryParseProgram(Code, out var prog, out var error, out var pos);
+
+        if (status)
+        {
+            Structure = Printer.Transform(prog);
+            var translator = new ModelTranslatorV1();
+
+            var logger = new NoLogger();
+
+          
+            var model = translator.Translate(prog.ClassDefinitions.Last());
+
+        
+            IIntegrator integrator =Explicit ? (IIntegrator)new ExplicitEuler(): (IIntegrator)new ImplicitEuler();
+            integrator.StepSize = TimeStep;
+            integrator.EndTime = EndTime;
+            integrator.Discretize(model);
+          
+            model.Initialize(new NoLogger());
+
+
+            Data.Clear();
+            Names.Clear();
+
+            Stopwatch w = new Stopwatch();
+            w.Start();
+            var results = integrator.Integrate(model, logger);
+            w.Stop();
+            Error = "Integration took " + w.ElapsedMilliseconds + "ms";
+            for (int c = 0; c < model.AlgebraicVariables.Count; c++)
+            {
+                var list = new List<DataItem>();
+
+                for (int i = 0; i < results.Count; i += Skip)
+                {
+                    if (i < results.Count)
+                    {
+                        list.Add(new DataItem() { Time = results[i].Time, Value = results[i].AlgebraicStates[c] });
+
+                    }
+                }
+                Names.Add(model.AlgebraicVariables[c].Name);
+                Data.Add(list);
+            }
+
+        }
+        else
+            Error = error;
+
+
+        this.StateHasChanged();
+    }
+
+
+    private void UpdateCode(ChangeEventArgs args)
+    {
+        try
+        {
+            Code = args.Value.ToString();
+
+            var status = Parser.TryParseProgram(Code, out var prog, out var error, out var pos);
+
+            if (status)
+            {
+                Structure = Printer.Transform(prog);
+                Error = "";
+            }
+            else
+                Error = error;
+        }
+        catch (Exception e)
+        {
+            Error = e.Message;
+        }
+
+    }
+
+
+
+
+}
